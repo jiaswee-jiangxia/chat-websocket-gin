@@ -20,10 +20,6 @@ func main() {
 		chat.ServeWS(c, roomId, hub)
 
 	})
-<<<<<<< HEAD
 	_ = app.Run(":20192")
-
-=======
 	app.Run()
->>>>>>> master
 }
