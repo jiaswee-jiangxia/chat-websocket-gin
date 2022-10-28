@@ -8,3 +8,6 @@ Example of using gorilla websocket with gin (chat with rooms)
 Websocket route will be ws://localhost:8080/chat/ws/ + any name
 
 for example: ws://localhost:8080/chat/ws/room1
+
+# RabbitMq
+``https://www.rabbitmq.com/tutorials/tutorial-one-go.html``

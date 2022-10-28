@@ -4,7 +4,7 @@ import (
 	"fmt"
 )
 
-//Hub is a struct that holds all the clients and the messages that are sent to them
+// Hub is a struct that holds all the clients and the messages that are sent to them
 type Hub struct {
 	// Registered clients.
 	clients map[string]map[*Client]bool
@@ -16,13 +16,13 @@ type Hub struct {
 	broadcast chan Message
 }
 
-//Message struct to hold message data
+// Message struct to hold message data
 type Message struct {
-	Type      string  `json:"type"`
-	Sender    string  `json:"sender"`
-	Recipient string  `json:"recipient"`
-	Content   string  `json:"content"`
-	ID        string  `json:"id"`
+	Type      string `json:"type"`
+	Sender    string `json:"sender"`
+	Recipient string `json:"recipient"`
+	Content   string `json:"content"`
+	ID        string `json:"id"`
 }
 
 func NewHub() *Hub {
@@ -34,7 +34,7 @@ func NewHub() *Hub {
 	}
 }
 
-//Core function to run the hub
+// Core function to run the hub
 func (h *Hub) Run() {
 	for {
 		select {
@@ -54,7 +54,7 @@ func (h *Hub) Run() {
 	}
 }
 
-//function check if room exists and if not create it and add client to it
+// function check if room exists and if not create it and add client to it
 func (h *Hub) RegisterNewClient(client *Client) {
 	connections := h.clients[client.ID]
 	if connections == nil {
@@ -66,7 +66,7 @@ func (h *Hub) RegisterNewClient(client *Client) {
 	fmt.Println("Size of clients: ", len(h.clients[client.ID]))
 }
 
-//function to remvoe client from room
+// function to remvoe client from room
 func (h *Hub) RemoveClient(client *Client) {
 	if _, ok := h.clients[client.ID]; ok {
 		delete(h.clients[client.ID], client)
@@ -75,7 +75,7 @@ func (h *Hub) RemoveClient(client *Client) {
 	}
 }
 
-//function to handle message based on type of message
+// function to handle message based on type of message
 func (h *Hub) HandleMessage(message Message) {
 
 	//Check if the message is a type of "message"
@@ -94,6 +94,7 @@ func (h *Hub) HandleMessage(message Message) {
 	//Check if the message is a type of "notification"
 	if message.Type == "notification" {
 		fmt.Println("Notification: ", message.Content)
+		fmt.Println(h.clients["2"])
 		clients := h.clients[message.Recipient]
 		for client := range clients {
 			select {

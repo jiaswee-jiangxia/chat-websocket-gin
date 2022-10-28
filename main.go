@@ -3,6 +3,7 @@ package main
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/tinkerbaj/chatwebsocketgin/chat"
+	"github.com/tinkerbaj/chatwebsocketgin/middleware"
 )
 
 func main() {
@@ -13,10 +14,12 @@ func main() {
 
 	//we need pass hub to out route with roomid
 	app := gin.Default()
+	app.Use(middleware.Next())
 	app.GET("/ws/:roomId", func(c *gin.Context) {
 		roomId := c.Param("roomId")
 		chat.ServeWS(c, roomId, hub)
 
 	})
+	_ = app.Run(":20192")
 
 }
