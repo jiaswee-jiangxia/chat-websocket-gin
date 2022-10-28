@@ -18,5 +18,5 @@ func main() {
 		chat.ServeWS(c, roomId, hub)
 
 	})
-
+	app.Run()
 }

@@ -5,6 +5,6 @@ Example of using gorilla websocket with gin (chat with rooms)
 * Enter in console "go mod tidy" to fetch all packages project need
 * Enter "go run main.go" to start server
 
-Websocket route will be ws://localhost:8080/chat/ws/ + any name
+Websocket route will be ws://localhost:8080/ws/ + any name
 
-for example: ws://localhost:8080/chat/ws/room1
+for example: ws://localhost:8080/ws/room1
