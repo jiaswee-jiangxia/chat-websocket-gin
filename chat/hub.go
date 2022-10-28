@@ -4,33 +4,13 @@ import (
 	"fmt"
 )
 
-// Hub is a struct that holds all the clients and the messages that are sent to them
-type Hub struct {
-	// Registered clients.
-	clients map[string]map[*Client]bool
-	//Unregistered clients.
-	unregister chan *Client
-	// Register requests from the clients.
-	register chan *Client
-	// Inbound messages from the clients.
-	broadcast chan Message
-}
-
-// Message struct to hold message data
-type Message struct {
-	Type      string `json:"type"`
-	Sender    string `json:"sender"`
-	Recipient string `json:"recipient"`
-	Content   string `json:"content"`
-	ID        string `json:"id"`
-}
-
 func NewHub() *Hub {
 	return &Hub{
-		clients:    make(map[string]map[*Client]bool),
-		unregister: make(chan *Client),
-		register:   make(chan *Client),
-		broadcast:  make(chan Message),
+		Clients:    make(map[int64]*Client),
+		Rooms:      make(map[string]*Room),
+		Unregister: make(chan *Client),
+		Register:   make(chan RegisterStruct),
+		Broadcast:  make(chan Message),
 	}
 }
 
@@ -39,39 +19,59 @@ func (h *Hub) Run() {
 	for {
 		select {
 		// Register a client.
-		case client := <-h.register:
-			h.RegisterNewClient(client)
+		case client := <-h.Register:
+			h.RegisterNewClient(&client.client, client.roomID)
 			// Unregister a client.
-		case client := <-h.unregister:
+		case client := <-h.Unregister:
 			h.RemoveClient(client)
 			// Broadcast a message to all clients.
-		case message := <-h.broadcast:
-
+		case message := <-h.Broadcast:
 			//Check if the message is a type of "message"
 			h.HandleMessage(message)
-
 		}
 	}
 }
 
-// function check if room exists and if not create it and add client to it
-func (h *Hub) RegisterNewClient(client *Client) {
-	connections := h.clients[client.ID]
-	if connections == nil {
-		connections = make(map[*Client]bool)
-		h.clients[client.ID] = connections
-	}
-	h.clients[client.ID][client] = true
+// function to add client
+func (h *Hub) RegisterNewClient(client *Client, roomID string) {
+	fmt.Println(client.ID)
+	h.Clients[client.ID] = client
+	h.CreateRoomIfNotExist(roomID)
+	h.Rooms[roomID].Clients[client.ID] = client
+	fmt.Println("Size of clients: ", len(h.Clients))
+}
 
-	fmt.Println("Size of clients: ", len(h.clients[client.ID]))
+// function check if room exists and if not create it
+func (h *Hub) CreateRoomIfNotExist(RoomID string) {
+	if _, ok := h.Rooms[RoomID]; !ok {
+		h.Rooms[RoomID] = CreateNewRoom(RoomID)
+	}
 }
 
 // function to remvoe client from room
 func (h *Hub) RemoveClient(client *Client) {
-	if _, ok := h.clients[client.ID]; ok {
-		delete(h.clients[client.ID], client)
+	if _, ok := h.Clients[client.ID]; ok {
+		for _, r := range client.Room {
+			delete(r.Clients, client.ID) // Delete from all rooms
+		}
+		delete(h.Clients, client.ID) // Delete from hub
 		close(client.send)
 		fmt.Println("Removed client")
+	}
+}
+
+func (h *Hub) SendNotification(RoomID string, content string) {
+	message := &Message{
+		ID:        "",
+		Type:      "notification",
+		Sender:    "0",
+		Recipient: RoomID,
+		Content:   content,
+	}
+	room := h.Rooms[RoomID]
+	if room != nil {
+		fmt.Println("Send notification")
+		h.Rooms[RoomID].Message <- *message
 	}
 }
 
@@ -80,30 +80,16 @@ func (h *Hub) HandleMessage(message Message) {
 
 	//Check if the message is a type of "message"
 	if message.Type == "message" {
-		clients := h.clients[message.ID]
-		for client := range clients {
-			select {
-			case client.send <- message:
-			default:
-				close(client.send)
-				delete(h.clients[message.ID], client)
-			}
+		room := h.Rooms[message.Recipient]
+		if room != nil {
+			room.Message <- message
 		}
 	}
 
-	//Check if the message is a type of "notification"
 	if message.Type == "notification" {
-		fmt.Println("Notification: ", message.Content)
-		fmt.Println(h.clients["2"])
-		clients := h.clients[message.Recipient]
-		for client := range clients {
-			select {
-			case client.send <- message:
-			default:
-				close(client.send)
-				delete(h.clients[message.Recipient], client)
-			}
+		room := h.Rooms[message.Recipient]
+		if room != nil {
+			room.Message <- message
 		}
 	}
-
 }

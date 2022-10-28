@@ -3,6 +3,7 @@ package chat
 import (
 	"fmt"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -31,24 +32,22 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
-//Client struct for websocket connection and message sending
-type Client struct {
-	ID   string
-	Conn *websocket.Conn
-	send chan Message
-	hub  *Hub
+// NewClient creates a new client
+func NewClient(id int64, conn *websocket.Conn, hub *Hub) *Client {
+	return &Client{
+		ID:   id,
+		Conn: conn,
+		send: make(chan Message, 256),
+		hub:  hub,
+		Room: nil,
+	}
 }
 
-//NewClient creates a new client
-func NewClient(id string, conn *websocket.Conn, hub *Hub) *Client {
-	return &Client{ID: id, Conn: conn, send: make(chan Message, 256), hub: hub}
-}
-
-//Client goroutine to read messages from client
+// Client goroutine to read messages from client
 func (c *Client) Read() {
 
 	defer func() {
-		c.hub.unregister <- c
+		c.hub.Unregister <- c
 		c.Conn.Close()
 	}()
 
@@ -62,11 +61,13 @@ func (c *Client) Read() {
 			fmt.Println("Error: ", err)
 			break
 		}
-		c.hub.broadcast <- msg
+		senderID := strconv.FormatInt(c.ID, 10)
+		msg.Sender = senderID
+		c.hub.Broadcast <- msg
 	}
 }
 
-//Client goroutine to write messages to client
+// Client goroutine to write messages to client
 func (c *Client) Write() {
 	ticker := time.NewTicker(pingPeriod)
 	defer func() {
@@ -99,22 +100,31 @@ func (c *Client) Write() {
 	}
 }
 
-//Client closing channel to unregister client
+// Client closing channel to unregister client
 func (c *Client) Close() {
 	close(c.send)
 }
 
-//Function to handle websocket connection and register client to hub and start goroutines
+type RegisterStruct struct {
+	client Client
+	roomID string
+}
+
+// Function to handle websocket connection and register client to hub and start goroutines
 func ServeWS(ctx *gin.Context, roomId string, hub *Hub) {
-	fmt.Print(roomId)
 	ws, err := upgrader.Upgrade(ctx.Writer, ctx.Request, nil)
 	if err != nil {
 		fmt.Println(err.Error())
 		return
 	}
-	client := NewClient(roomId, ws, hub)
-
-	hub.register <- client
+	ids, _ := ctx.Get("client-counter")
+	id := ids.(int)
+	client := NewClient(int64(id), ws, hub)
+	reg := RegisterStruct{
+		client: *client,
+		roomID: roomId,
+	}
+	hub.Register <- reg
 	go client.Write()
 	go client.Read()
 }
