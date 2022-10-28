@@ -2,6 +2,7 @@
 Example of using gorilla websocket with gin (chat with rooms)
 
 * Clone repo
+* Enter "cd chat-websocket-gin" to move to project directory
 * Enter in console "go mod tidy" to fetch all packages project need
 * Enter "go run main.go" to start server
 
