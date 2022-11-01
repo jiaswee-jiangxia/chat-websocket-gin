@@ -1,8 +1,9 @@
 package middleware
 
 import (
-	"github.com/gin-gonic/gin"
 	"net/http"
+
+	"github.com/gin-gonic/gin"
 )
 
 var domains = []string{
@@ -23,6 +24,15 @@ func Next() gin.HandlerFunc {
 		if method == "OPTIONS" {
 			c.AbortWithStatus(http.StatusAccepted)
 		}
+		c.Next()
+	}
+}
+
+func Count() gin.HandlerFunc {
+	counter := 0
+	return func(c *gin.Context) {
+		counter += 1
+		c.Set("client-counter", counter)
 		c.Next()
 	}
 }

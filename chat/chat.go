@@ -3,6 +3,7 @@ package chat
 import (
 	"fmt"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -31,24 +32,22 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
-//Client struct for websocket connection and message sending
-type Client struct {
-	ID   string
-	Conn *websocket.Conn
-	send chan Message
-	hub  *Hub
+// NewClient creates a new client
+func NewClient(id int64, conn *websocket.Conn, hub *Hub) *Client {
+	return &Client{
+		ID:   id,
+		Conn: conn,
+		Send: make(chan Response, 1),
+		hub:  hub,
+		Room: make(map[string]*Room),
+	}
 }
 
-//NewClient creates a new client
-func NewClient(id string, conn *websocket.Conn, hub *Hub) *Client {
-	return &Client{ID: id, Conn: conn, send: make(chan Message, 256), hub: hub}
-}
-
-//Client goroutine to read messages from client
+// Client goroutine to read messages from client
 func (c *Client) Read() {
 
 	defer func() {
-		c.hub.unregister <- c
+		c.hub.Unregister <- c
 		c.Conn.Close()
 	}()
 
@@ -56,17 +55,19 @@ func (c *Client) Read() {
 	c.Conn.SetReadDeadline(time.Now().Add(pongWait))
 	c.Conn.SetPongHandler(func(string) error { c.Conn.SetReadDeadline(time.Now().Add(pongWait)); return nil })
 	for {
-		var msg Message
-		err := c.Conn.ReadJSON(&msg)
+		var req Request
+		err := c.Conn.ReadJSON(&req)
 		if err != nil {
 			fmt.Println("Error: ", err)
 			break
 		}
-		c.hub.broadcast <- msg
+		senderID := strconv.FormatInt(c.ID, 10)
+		req.Sender = senderID
+		c.hub.Request <- req
 	}
 }
 
-//Client goroutine to write messages to client
+// Client goroutine to write messages to client
 func (c *Client) Write() {
 	ticker := time.NewTicker(pingPeriod)
 	defer func() {
@@ -76,7 +77,7 @@ func (c *Client) Write() {
 
 	for {
 		select {
-		case message, ok := <-c.send:
+		case message, ok := <-c.Send:
 			c.Conn.SetWriteDeadline(time.Now().Add(writeWait))
 			if !ok {
 				// The hub closed the channel.
@@ -99,22 +100,25 @@ func (c *Client) Write() {
 	}
 }
 
-//Client closing channel to unregister client
+// Client closing channel to unregister client
 func (c *Client) Close() {
-	close(c.send)
+	close(c.Send)
 }
 
-//Function to handle websocket connection and register client to hub and start goroutines
-func ServeWS(ctx *gin.Context, roomId string, hub *Hub) {
-	fmt.Print(roomId)
+func RegisterWS(ctx *gin.Context, hub *Hub) {
 	ws, err := upgrader.Upgrade(ctx.Writer, ctx.Request, nil)
 	if err != nil {
 		fmt.Println(err.Error())
 		return
 	}
-	client := NewClient(roomId, ws, hub)
-
-	hub.register <- client
+	ids, _ := ctx.Get("client-counter")
+	id := ids.(int)
+	// Create new client connection
+	client := NewClient(int64(id), ws, hub)
+	reg := RegisterStruct{
+		client: *client,
+	}
+	hub.Register <- reg
 	go client.Write()
 	go client.Read()
 }
