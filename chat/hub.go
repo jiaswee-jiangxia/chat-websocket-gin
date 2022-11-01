@@ -84,11 +84,16 @@ func (h *Hub) RegisterNewClient(client *Client) {
 
 // function to join a room
 func (h *Hub) JoinRoom(client *Client, roomID string) {
-	h.CreateRoomIfNotExist(roomID)
 	fmt.Println("Client:", client)
 	fmt.Println("RoomID:", roomID)
 	fmt.Println("All client:", h.Clients)
-	h.Rooms[roomID].Clients[client.ID] = client
+	if _, ok := h.Rooms[roomID]; ok {
+		if client != nil {
+			h.CreateRoomIfNotExist(roomID)
+			h.Rooms[roomID].Clients[client.ID] = client
+			client.Room[roomID] = h.Rooms[roomID]
+		}
+	}
 }
 
 // function to join a room
@@ -96,8 +101,15 @@ func (h *Hub) LeaveRoom(client *Client, roomID string) {
 	fmt.Println("Client:", client)
 	fmt.Println("RoomID:", roomID)
 	fmt.Println("All client:", h.Clients)
-	delete(h.Rooms[roomID].Clients, client.ID)
-	delete(client.Room, roomID)
+	if val, ok := h.Rooms[roomID]; ok {
+		if _, ok := val.Clients[client.ID]; ok {
+			delete(h.Rooms[roomID].Clients, client.ID)
+			fmt.Printf("Room %v, client %v", roomID, h.Rooms[roomID].Clients)
+		}
+	}
+	if _, ok := client.Room[roomID]; ok {
+		delete(client.Room, roomID)
+	}
 }
 
 // function check if room exists and if not create it

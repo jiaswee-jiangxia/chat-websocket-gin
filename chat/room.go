@@ -3,7 +3,7 @@ package chat
 func CreateNewRoom(RoomID string) *Room {
 	room := Room{
 		ID:       RoomID,
-		Clients:  make(map[int64]*Client, 0),
+		Clients:  make(map[int64]*Client),
 		Response: make(chan Response),
 	}
 	go room.Open()

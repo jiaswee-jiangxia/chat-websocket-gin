@@ -39,7 +39,7 @@ func NewClient(id int64, conn *websocket.Conn, hub *Hub) *Client {
 		Conn: conn,
 		Send: make(chan Response, 256),
 		hub:  hub,
-		Room: nil,
+		Room: make(map[string]*Room),
 	}
 }
 
