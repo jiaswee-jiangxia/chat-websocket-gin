@@ -3,6 +3,8 @@ package chat
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
+	"strings"
 )
 
 func NewHub() *Hub {
@@ -11,7 +13,7 @@ func NewHub() *Hub {
 		Rooms:      make(map[string]*Room),
 		Unregister: make(chan *Client),
 		Register:   make(chan RegisterStruct),
-		Broadcast:  make(chan Message),
+		Broadcast:  make(chan Message, 1),
 		Request:    make(chan Request),
 		EnterRoom:  make(chan JoinRoomStruct),
 	}
@@ -56,7 +58,6 @@ func (h *Hub) HandleRequest(req Request) {
 		if err != nil {
 			fmt.Println(err)
 		}
-		fmt.Println(string(jsonBody))
 		h.JoinRoom(h.Clients[int64(jrs.ClientID)], jrs.RoomID)
 	}
 	if req.Event == "leave_room" {
@@ -68,7 +69,6 @@ func (h *Hub) HandleRequest(req Request) {
 		if err != nil {
 			fmt.Println(err)
 		}
-		fmt.Println(string(jsonBody))
 		h.LeaveRoom(h.Clients[int64(jrs.ClientID)], jrs.RoomID)
 	}
 
@@ -78,7 +78,21 @@ func (h *Hub) HandleRequest(req Request) {
 // function to add client
 func (h *Hub) RegisterNewClient(client *Client) {
 	h.Clients[client.ID] = client
-	h.JoinRoom(client, "room1")
+	ClientID := strconv.Itoa(int(client.ID))
+	RoomList := h.GetRoomList()
+	keys := make([]string, 0, len(RoomList))
+	for key := range RoomList {
+		keys = append(keys, key)
+	}
+
+	list := strings.Join(keys, ",")
+	msg := Message{
+		Type:      "private",
+		Content:   list,
+		Recipient: ClientID,
+		Sender:    "0",
+	}
+	h.Broadcast <- msg
 	fmt.Println("Size of clients: ", len(h.Clients))
 }
 
@@ -87,9 +101,9 @@ func (h *Hub) JoinRoom(client *Client, roomID string) {
 	fmt.Println("Client:", client)
 	fmt.Println("RoomID:", roomID)
 	fmt.Println("All client:", h.Clients)
+	h.CreateRoomIfNotExist(roomID)
 	if _, ok := h.Rooms[roomID]; ok {
 		if client != nil {
-			h.CreateRoomIfNotExist(roomID)
 			h.Rooms[roomID].Clients[client.ID] = client
 			client.Room[roomID] = h.Rooms[roomID]
 		}
@@ -164,6 +178,18 @@ func (h *Hub) HandleMessage(message Message) {
 		room := h.Rooms[message.Recipient]
 		if room != nil {
 			room.Response <- *res
+		}
+	}
+
+	if message.Type == "private" {
+		res := &Response{
+			Event:  "private",
+			Status: "success",
+			Data:   message,
+		}
+		recipientID, _ := strconv.ParseInt(message.Recipient, 10, 64)
+		if c, ok := h.Clients[recipientID]; ok {
+			c.Send <- *res
 		}
 	}
 }
