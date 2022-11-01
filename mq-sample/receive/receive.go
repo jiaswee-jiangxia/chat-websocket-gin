@@ -15,14 +15,18 @@ func main() {
 	defer ch.Close()
 
 	q, err := ch.QueueDeclare(
-		"hello", // name
-		false,   // durable
-		false,   // delete when unused
-		false,   // exclusive
-		false,   // no-wait
-		nil,     // arguments
+		"",    // name
+		false, // durable
+		false, // delete when unused
+		false, // exclusive
+		false, // no-wait
+		nil,   // arguments
 	)
+	_ = ch.ExchangeDeclare("logs", "fanout", false, false, false, false, nil)
+
 	failOnError(err, "Failed to declare a queue")
+
+	_ = ch.QueueBind(q.Name, "", "logs", false, nil)
 
 	msgs, err := ch.Consume(
 		q.Name, // queue
